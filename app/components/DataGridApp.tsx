@@ -136,54 +136,70 @@ const TranslationGrid = () => {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Fordítások kezelése</CardTitle>
-        <div className="flex justify-between items-center">
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleFinalize}
-              disabled={selectedRows.size === 0}
-            >
-              <Check className="mr-2 h-4 w-4" />
-              Kijelölt fordítások véglegesítése
-            </Button>
-          </div>
+        <CardTitle className="text-xl font-semibold mb-2">Fordítások kezelése</CardTitle>
+        <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
+          <Button 
+            onClick={handleFinalize}
+            disabled={selectedRows.size === 0}
+            size="sm"
+            className="w-full sm:w-auto"
+          >
+            <Check className="mr-2 h-4 w-4" />
+            Kijelölt fordítások véglegesítése
+          </Button>
           <div className="flex items-center gap-2">
             <Button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
+              size="sm"
+              variant="outline"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm">
+            <span className="text-xs text-muted-foreground">
               {page} / {totalPages} oldal
               ({totalItems} elem)
             </span>
             <Button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
+              size="sm"
+              variant="outline"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-1 sm:p-2">
         {loading ? (
-          <div className="text-center p-4">Betöltés...</div>
+          <div className="text-center p-2 text-sm">Betöltés...</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
               <thead>
-                <tr>
-                  <th className="p-2 border">Kijelölés</th>
+                <tr className="bg-gray-50">
+                  <th className="p-1 border text-center">
+                    <input 
+                      type="checkbox" 
+                      className="h-3 w-3"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedRows(new Set(data.filter(row => !row.is_translated).map(row => row.id)));
+                        } else {
+                          setSelectedRows(new Set());
+                        }
+                      }}
+                    />
+                  </th>
                   {columns.map(column => (
-                    <th key={column.id} className="p-2 border" style={{ width: column.width }}>
-                      <div className="mb-2">{column.name}</div>
+                    <th key={column.id} className="p-1 border text-left">
+                      <div className="text-xs font-semibold mb-1">{column.name}</div>
                       <Input
-                        placeholder={`Szűrés...`}
+                        placeholder="Szűrés..."
                         value={filters[column.id] || ''}
                         onChange={(e) => handleFilter(column.id, e.target.value)}
-                        className="w-full"
+                        className="h-7 text-xs"
                       />
                     </th>
                   ))}
@@ -191,39 +207,42 @@ const TranslationGrid = () => {
               </thead>
               <tbody>
                 {data.map(row => (
-                  <tr key={row.id} className={row.is_translated ? 'bg-green-50' : ''}>
-                    <td className="p-2 border text-center">
+                  <tr 
+                    key={row.id} 
+                    className={`${row.is_translated ? 'bg-green-50' : 'hover:bg-gray-50'} border-b`}
+                  >
+                    <td className="p-1 border text-center">
                       <input
                         type="checkbox"
                         checked={selectedRows.has(row.id)}
                         onChange={() => handleRowSelect(row.id)}
-                        className="w-4 h-4"
+                        className="h-3 w-3"
                         disabled={row.is_translated}
                       />
                     </td>
                     {columns.map(column => (
                       <td 
                         key={`${row.id}-${column.id}`} 
-                        className="p-2 border"
-                        style={{ width: column.width }}
+                        className="p-1 border text-xs"
                       >
-                        <div 
-                          className="overflow-hidden text-ellipsis whitespace-nowrap" 
-                          title={column.id === 'is_translated' ? 
-                            (row[column.id] ? 'Igen' : 'Nem') : 
-                            row[column.id] !== null ? String(row[column.id]) : ''}
-                        >
-                          {column.editable && !row.is_translated ? (
-                            <Input
-                              value={row[column.id]?.toString() || ''}
-                              onChange={(e) => handleCellEdit(row.id, column.id, e.target.value)}
-                            />
-                          ) : (
-                            column.id === 'is_translated' ? 
+                        {column.editable && !row.is_translated ? (
+                          <Input
+                            value={row[column.id]?.toString() || ''}
+                            onChange={(e) => handleCellEdit(row.id, column.id, e.target.value)}
+                            className="h-7 text-xs"
+                          />
+                        ) : (
+                          <div 
+                            className="truncate max-w-[200px]" 
+                            title={column.id === 'is_translated' ? 
+                              (row[column.id] ? 'Igen' : 'Nem') : 
+                              row[column.id] !== null ? String(row[column.id]) : ''}
+                          >
+                            {column.id === 'is_translated' ? 
                               (row[column.id] ? 'Igen' : 'Nem') :
-                              row[column.id]
-                          )}
-                        </div>
+                              row[column.id]}
+                          </div>
+                        )}
                       </td>
                     ))}
                   </tr>
