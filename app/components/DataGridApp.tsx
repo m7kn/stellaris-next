@@ -1,0 +1,240 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Check, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useDebounce } from 'use-debounce';
+import { TableData } from '@/types/TableData';
+import { Translations } from '@/types/Translations';
+
+const TranslationGrid = () => {
+  const [data, setData] = useState<Translations[]>([]);
+  const [selectedRows, setSelectedRows] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(50);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [filters, setFilters] = useState<{ [key: string]: string }>({});
+  const [debouncedFilters] = useDebounce(filters, 500);
+
+  const columns: { id: keyof Translations, name: string, editable: boolean, width: string }[] = [
+    { id: 'id', name: 'ID', editable: false, width: '80px' },
+    { id: 'filename', name: 'Fájl', editable: false, width: '150px' },
+    { id: 'key', name: 'Kulcs', editable: false, width: '200px' },
+    { id: 'english_text', name: 'Angol szöveg', editable: false, width: '250px' },
+    { id: 'temp_hungarian', name: 'Ideiglenes magyar', editable: true, width: '250px' },
+    { id: 'final_hungarian', name: 'Végleges magyar', editable: false, width: '250px' },
+    { id: 'is_translated', name: 'Fordítva', editable: false, width: '100px' }
+  ];
+
+  const fetchTranslations = async () => {
+    try {
+      setLoading(true);
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        pageSize: pageSize.toString(),
+        ...debouncedFilters
+      });
+      
+      const response = await fetch(`/api/translations?${queryParams}`);
+      if (!response.ok) throw new Error('Network response was not ok');
+      const result: TableData = await response.json();
+      
+      // Módosítjuk a fájlneveket a kiterjesztés eltávolításához
+      const processedData = result.data.map(item => ({
+        ...item,
+        filename: item.filename.replace(/^\/.*\//, '')
+      }));
+     
+      setData(processedData);
+      setTotalPages(result.totalPages);
+      setTotalItems(result.total);
+      setLoading(false);
+    } catch (error) {
+      console.error('Hiba az adatok betöltésekor:', error);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTranslations();
+  }, [page, debouncedFilters]);
+
+  const handleCellEdit = async (rowId: number, columnId: string, value: string) => {
+    if (columnId !== 'temp_hungarian') return;
+
+    try {
+      const response = await fetch('/api/translations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateTranslation',
+          id: rowId,
+          temp_hungarian: value
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update data');
+
+      const newData = data.map(row => {
+        if (row.id === rowId) {
+          return { ...row, [columnId]: value };
+        }
+        return row;
+      });
+      setData(newData);
+    } catch (error) {
+      console.error('Hiba a szerkesztés során:', error);
+      alert('Hiba történt a szerkesztés során');
+    }
+  };
+
+  const handleFilter = (columnId: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [columnId]: value
+    }));
+    setPage(1); // Reset to first page when filtering
+  };
+
+  const handleRowSelect = (rowId: number) => {
+    const newSelected = new Set(selectedRows);
+    if (newSelected.has(rowId)) {
+      newSelected.delete(rowId);
+    } else {
+      newSelected.add(rowId);
+    }
+    setSelectedRows(newSelected);
+  };
+
+  const handleFinalize = async () => {
+    try {
+      const selectedIds = Array.from(selectedRows);
+      const response = await fetch('/api/translations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'finalize',
+          ids: selectedIds
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to finalize translations');
+
+      await fetchTranslations();
+      setSelectedRows(new Set());
+      alert('A kijelölt fordítások véglegesítve lettek');
+    } catch (error) {
+      console.error('Hiba a véglegesítés során:', error);
+      alert('Hiba történt a véglegesítés során');
+    }
+  };
+
+  return (
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Fordítások kezelése</CardTitle>
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleFinalize}
+              disabled={selectedRows.size === 0}
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Kijelölt fordítások véglegesítése
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm">
+              {page} / {totalPages} oldal
+              ({totalItems} elem)
+            </span>
+            <Button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="text-center p-4">Betöltés...</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="p-2 border">Kijelölés</th>
+                  {columns.map(column => (
+                    <th key={column.id} className="p-2 border" style={{ width: column.width }}>
+                      <div className="mb-2">{column.name}</div>
+                      <Input
+                        placeholder={`Szűrés...`}
+                        value={filters[column.id] || ''}
+                        onChange={(e) => handleFilter(column.id, e.target.value)}
+                        className="w-full"
+                      />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.map(row => (
+                  <tr key={row.id} className={row.is_translated ? 'bg-green-50' : ''}>
+                    <td className="p-2 border text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.has(row.id)}
+                        onChange={() => handleRowSelect(row.id)}
+                        className="w-4 h-4"
+                        disabled={row.is_translated}
+                      />
+                    </td>
+                    {columns.map(column => (
+                      <td 
+                        key={`${row.id}-${column.id}`} 
+                        className="p-2 border"
+                        style={{ width: column.width }}
+                      >
+                        <div 
+                          className="overflow-hidden text-ellipsis whitespace-nowrap" 
+                          title={column.id === 'is_translated' ? 
+                            (row[column.id] ? 'Igen' : 'Nem') : 
+                            row[column.id] !== null ? String(row[column.id]) : ''}
+                        >
+                          {column.editable && !row.is_translated ? (
+                            <Input
+                              value={row[column.id]?.toString() || ''}
+                              onChange={(e) => handleCellEdit(row.id, column.id, e.target.value)}
+                            />
+                          ) : (
+                            column.id === 'is_translated' ? 
+                              (row[column.id] ? 'Igen' : 'Nem') :
+                              row[column.id]
+                          )}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default TranslationGrid;
