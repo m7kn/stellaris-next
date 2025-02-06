@@ -10,8 +10,9 @@ import { useDebounce } from 'use-debounce';
 import { TableData } from '@/types/TableData';
 import { Translations } from '@/types/Translations';
 import SelectionControls from './SelectionControls';
+import EditDialog from './EditDialog';
 
-const TranslationGrid = () => {
+const DataGrid = () => {
   const [data, setData] = useState<Translations[]>([]);
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -177,6 +178,38 @@ const TranslationGrid = () => {
     handleRowSelect(row.id);
   };  
 
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingCell, setEditingCell] = useState<{
+    rowId: number;
+    value: string;
+    englishText: string;
+    key: string;
+  } | null>(null);
+
+  const handleCellClick = (row: Translations) => {
+    if (row.is_translated) return; // Ha már le van fordítva, ne lehessen szerkeszteni
+    
+    setEditingCell({
+      rowId: row.id,
+      value: row.temp_hungarian || '',
+      englishText: row.english_text,
+      key: row.key || ''
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSave = async (newValue: string) => {
+    if (!editingCell) return;
+
+    try {
+      await handleCellEdit(editingCell.rowId, 'temp_hungarian', newValue);
+      setEditingCell(null);
+    } catch (error) {
+      console.error('Hiba a szerkesztés során:', error);
+      alert('Hiba történt a szerkesztés során');
+    }
+  };  
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -273,14 +306,14 @@ const TranslationGrid = () => {
               </thead>
               <tbody>
                 {data.map(row => (
-                  <tr 
-                    key={row.id} 
-                    className={`${row.is_translated ? 'bg-green-50' : 'hover:bg-gray-50'} border-b cursor-pointer ${
-                      selectedRows.has(row.id) ? 'bg-blue-50' : ''
-                    }`}
-                    onClick={(e) => handleRowClick(e, row)}
-                  >
-                   <td className="p-1 border text-center" onClick={(e) => e.stopPropagation()}>
+                    <tr 
+                        key={row.id} 
+                        className={`${row.is_translated ? 'bg-green-50' : 'hover:bg-gray-50'} border-b cursor-pointer ${
+                            selectedRows.has(row.id) ? 'bg-blue-50' : ''
+                        }`}
+                        onClick={(e) => handleRowClick(e, row)}
+                    >
+                    <td className="p-1 border text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedRows.has(row.id)}
@@ -293,13 +326,15 @@ const TranslationGrid = () => {
                       <td 
                         key={`${row.id}-${column.id}`} 
                         className="p-1 border text-xs"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         {column.editable && !row.is_translated ? (
-                          <Input
-                            value={row[column.id]?.toString() || ''}
-                            onChange={(e) => handleCellEdit(row.id, column.id, e.target.value)}
-                            className="h-7 text-xs"
-                          />
+                          <div
+                            className="cursor-text p-1 hover:bg-gray-100 rounded"
+                            onClick={() => handleCellClick(row)}
+                          >
+                            {row[column.id]?.toString() || ''}
+                          </div>
                         ) : (
                           <div 
                             className="truncate max-w-[200px]" 
@@ -321,8 +356,21 @@ const TranslationGrid = () => {
           </div>
         )}
       </CardContent>
+      {editingCell && (
+        <EditDialog
+          isOpen={editDialogOpen}
+          onClose={() => {
+            setEditDialogOpen(false);
+            setEditingCell(null);
+          }}
+          onSave={handleEditSave}
+          initialValue={editingCell.value}
+          englishText={editingCell.englishText}
+          rowKey={editingCell.key}
+        />
+      )}      
     </Card>
   );
 };
 
-export default TranslationGrid;
+export default DataGrid;
