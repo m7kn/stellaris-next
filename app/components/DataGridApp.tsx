@@ -9,6 +9,7 @@ import { Check, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import { TableData } from '@/types/TableData';
 import { Translations } from '@/types/Translations';
+import SelectionControls from './SelectionControls';
 
 const TranslationGrid = () => {
   const [data, setData] = useState<Translations[]>([]);
@@ -135,10 +136,57 @@ const TranslationGrid = () => {
     }
   };
 
+  const handleSelectAll = () => {
+    const selectableIds = data
+      .filter(row => !row.is_translated)
+      .map(row => row.id);
+    setSelectedRows(new Set(selectableIds));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedRows(new Set());
+  };
+
+  const handleSelectRange = (start: number, end: number) => {
+    const visibleIds = data.map(row => row.id);
+    const startIndex = visibleIds.indexOf(start);
+    const endIndex = visibleIds.indexOf(end);
+    
+    if (startIndex === -1 || endIndex === -1) return;
+    
+    const [rangeStart, rangeEnd] = [
+      Math.min(startIndex, endIndex),
+      Math.max(startIndex, endIndex)
+    ];
+
+    const newSelected = new Set(selectedRows);
+    for (let i = rangeStart; i <= rangeEnd; i++) {
+      const row = data[i];
+      if (!row.is_translated) {
+        newSelected.add(row.id);
+      }
+    }
+    setSelectedRows(newSelected);
+  };
+
+  const handleRowClick = (event: React.MouseEvent, row: Translations) => {
+    // Ha input mezőre kattintottunk, ne csináljunk semmit
+    if ((event.target as HTMLElement).tagName === 'INPUT') return;
+    
+    // Egyébként Toggle a kijelölést
+    handleRowSelect(row.id);
+  };  
+
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-xl font-semibold mb-2">Fordítások kezelése</CardTitle>
+        <SelectionControls
+          onSelectAll={handleSelectAll}
+          onClearSelection={handleClearSelection}
+          onSelectRange={handleSelectRange}
+          visibleIds={data.map(row => row.id)}
+        />
         <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
           <Button 
             onClick={handleFinalize}
@@ -227,9 +275,12 @@ const TranslationGrid = () => {
                 {data.map(row => (
                   <tr 
                     key={row.id} 
-                    className={`${row.is_translated ? 'bg-green-50' : 'hover:bg-gray-50'} border-b`}
+                    className={`${row.is_translated ? 'bg-green-50' : 'hover:bg-gray-50'} border-b cursor-pointer ${
+                      selectedRows.has(row.id) ? 'bg-blue-50' : ''
+                    }`}
+                    onClick={(e) => handleRowClick(e, row)}
                   >
-                    <td className="p-1 border text-center">
+                   <td className="p-1 border text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedRows.has(row.id)}
