@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Check, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import { TableData } from '@/types/TableData';
@@ -20,14 +21,14 @@ const TranslationGrid = () => {
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
   const [debouncedFilters] = useDebounce(filters, 500);
 
-  const columns: { id: keyof Translations, name: string, editable: boolean, width: string }[] = [
+  const columns: { id: keyof Translations, name: string, editable: boolean, width: string, type?: string }[] = [
     { id: 'id', name: 'ID', editable: false, width: '80px' },
     { id: 'filename', name: 'Fájl', editable: false, width: '150px' },
     { id: 'key', name: 'Kulcs', editable: false, width: '200px' },
     { id: 'english_text', name: 'Angol szöveg', editable: false, width: '250px' },
     { id: 'temp_hungarian', name: 'Ideiglenes magyar', editable: true, width: '250px' },
     { id: 'final_hungarian', name: 'Végleges magyar', editable: false, width: '250px' },
-    { id: 'is_translated', name: 'Fordítva', editable: false, width: '100px' }
+    { id: 'is_translated', name: 'Fordítva', editable: false, width: '100px', type: 'boolean' }
   ];
 
   const fetchTranslations = async () => {
@@ -36,14 +37,15 @@ const TranslationGrid = () => {
       const queryParams = new URLSearchParams({
         page: page.toString(),
         pageSize: pageSize.toString(),
-        ...debouncedFilters
+        ...Object.fromEntries(
+          Object.entries(debouncedFilters).filter(([_, value]) => value !== 'all')
+        )
       });
       
       const response = await fetch(`/api/translations?${queryParams}`);
       if (!response.ok) throw new Error('Network response was not ok');
       const result: TableData = await response.json();
       
-      // Módosítjuk a fájlneveket a kiterjesztés eltávolításához
       const processedData = result.data.map(item => ({
         ...item,
         filename: item.filename.replace(/^\/.*\//, '')
@@ -97,7 +99,7 @@ const TranslationGrid = () => {
       ...prev,
       [columnId]: value
     }));
-    setPage(1); // Reset to first page when filtering
+    setPage(1);
   };
 
   const handleRowSelect = (rowId: number) => {
@@ -195,12 +197,28 @@ const TranslationGrid = () => {
                   {columns.map(column => (
                     <th key={column.id} className="p-1 border text-left">
                       <div className="text-xs font-semibold mb-1">{column.name}</div>
-                      <Input
-                        placeholder="Szűrés..."
-                        value={filters[column.id] || ''}
-                        onChange={(e) => handleFilter(column.id, e.target.value)}
-                        className="h-7 text-xs"
-                      />
+                      {column.type === 'boolean' ? (
+                        <Select
+                          value={filters[column.id] || 'all'}
+                          onValueChange={(value) => handleFilter(column.id, value)}
+                        >
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue placeholder="Szűrés..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Összes</SelectItem>
+                            <SelectItem value="true">Igen</SelectItem>
+                            <SelectItem value="false">Nem</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          placeholder="Szűrés..."
+                          value={filters[column.id] || ''}
+                          onChange={(e) => handleFilter(column.id, e.target.value)}
+                          className="h-7 text-xs"
+                        />
+                      )}
                     </th>
                   ))}
                 </tr>

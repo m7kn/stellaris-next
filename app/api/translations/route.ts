@@ -8,24 +8,56 @@ export async function GET(request: Request) {
       const { searchParams } = new URL(request.url);
       const page = parseInt(searchParams.get('page') || '1');
       const pageSize = parseInt(searchParams.get('pageSize') || '50');
-      const searchTerm = searchParams.get('search') || '';
       const offset = (page - 1) * pageSize;
-  
+
+      // Gyűjtsük ki a szűrőket
+      const filters: { [key: string]: string } = {};
+      const validColumns = ['id', 'filename', 'key', 'english_text', 'temp_hungarian', 'final_hungarian', 'is_translated'];
+      
+      validColumns.forEach(column => {
+        const value = searchParams.get(column);
+        if (value !== null && value !== '') {
+          filters[column] = value;
+        }
+      });
+
+      // SQL WHERE feltételek és paraméterek építése
+      let whereConditions: string[] = [];
+      let parameters: any[] = [];
+
+      Object.entries(filters).forEach(([column, value]) => {
+        if (column === 'is_translated') {
+          // Boolean érték kezelése
+          whereConditions.push(`t.is_translated = ?`);
+          parameters.push(value === 'true' ? 1 : 0);
+        } else if (column === 'filename') {
+          // Fájlnév kezelése (files táblából)
+          whereConditions.push(`LOWER(f.filename) LIKE LOWER(?)`);
+          parameters.push(`%${value}%`);
+        } else {
+          // Minden más mező kezelése
+          whereConditions.push(`LOWER(t.${column}) LIKE LOWER(?)`);
+          parameters.push(`%${value}%`);
+        }
+      });
+
+      // Alap WHERE feltétel, ha nincs szűrő
+      const whereClause = whereConditions.length > 0 
+        ? `WHERE ${whereConditions.join(' AND ')}` 
+        : '';
+
       // Összes találat számának lekérése
-      const totalCount = db.prepare(`
+      const countQuery = `
         SELECT COUNT(*) as count
         FROM translations t
         LEFT JOIN files f ON t.file_id = f.id
-        WHERE 
-          LOWER(t.english_text) LIKE LOWER(?) OR
-          LOWER(t.temp_hungarian) LIKE LOWER(?) OR
-          LOWER(t.final_hungarian) LIKE LOWER(?) OR
-          LOWER(f.filename) LIKE LOWER(?) OR
-          LOWER(t.key) LIKE LOWER(?)
-      `).get(`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`) as { count: number };
-  
+        ${whereClause}
+      `;
+      
+      const totalCount = db.prepare(countQuery).get(...parameters) as { count: number };
+
       // Aktuális oldal adatainak lekérése
-      const translations = db.prepare(`
+      const dataQuery = `
         SELECT 
           t.id, t.line_number, t.line_type, t.key, t.english_text, 
           t.temp_hungarian, t.final_hungarian, t.is_translated,
@@ -33,23 +65,14 @@ export async function GET(request: Request) {
           f.filename
         FROM translations t
         LEFT JOIN files f ON t.file_id = f.id
-        WHERE 
-          LOWER(t.english_text) LIKE LOWER(?) OR
-          LOWER(t.temp_hungarian) LIKE LOWER(?) OR
-          LOWER(t.final_hungarian) LIKE LOWER(?) OR
-          LOWER(f.filename) LIKE LOWER(?) OR
-          LOWER(t.key) LIKE LOWER(?)
+        ${whereClause}
         ORDER BY t.file_id, t.line_number
         LIMIT ? OFFSET ?
-      `).all(
-        `%${searchTerm}%`, 
-        `%${searchTerm}%`, 
-        `%${searchTerm}%`, 
-        `%${searchTerm}%`, 
-        `%${searchTerm}%`,
-        pageSize, 
-        offset
-      );
+      `;
+
+      // Paraméterek kiegészítése a LIMIT és OFFSET értékekkel
+      const queryParams = [...parameters, pageSize, offset];
+      const translations = db.prepare(dataQuery).all(...queryParams);
       
       return NextResponse.json({
         data: translations,
