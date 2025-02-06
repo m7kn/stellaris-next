@@ -171,9 +171,13 @@ const DataGrid = () => {
   };
 
   const handleRowClick = (event: React.MouseEvent, row: Translations) => {
-    // Ha input mezőre kattintottunk, ne csináljunk semmit
-    if ((event.target as HTMLElement).tagName === 'INPUT') return;
-    
+    if (row.is_translated) {
+      event.stopPropagation();
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+
     // Egyébként Toggle a kijelölést
     handleRowSelect(row.id);
   };  
@@ -186,7 +190,9 @@ const DataGrid = () => {
     key: string;
   } | null>(null);
 
-  const handleCellClick = (row: Translations) => {
+  const handleCellClick = (row: Translations, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
     if (row.is_translated) return; // Ha már le van fordítva, ne lehessen szerkeszteni
     
     setEditingCell({
@@ -308,30 +314,30 @@ const DataGrid = () => {
                 {data.map(row => (
                     <tr 
                         key={row.id} 
-                        className={`${row.is_translated ? 'bg-green-50' : 'hover:bg-gray-50'} border-b cursor-pointer ${
+                        className={`${row.is_translated ? 'bg-green-50' : ''} border-b cursor-pointer ${
                             selectedRows.has(row.id) ? 'bg-blue-50' : ''
-                        }`}
+                        } hover:bg-sky-100`}
                         onClick={(e) => handleRowClick(e, row)}
                     >
-                    <td className="p-1 border text-center" onClick={(e) => e.stopPropagation()}>
+                    <td className="p-1 border text-center">
                       <input
                         type="checkbox"
                         checked={selectedRows.has(row.id)}
                         onChange={() => handleRowSelect(row.id)}
                         className="h-3 w-3"
                         disabled={row.is_translated}
+                        onClick={(e) => e.stopPropagation()}
                       />
                     </td>
                     {columns.map(column => (
                       <td 
                         key={`${row.id}-${column.id}`} 
-                        className="p-1 border text-xs"
-                        onClick={(e) => e.stopPropagation()}
+                        className="p-1 border text-xs"                        
                       >
                         {column.editable && !row.is_translated ? (
                           <div
                             className="cursor-text p-1 hover:bg-gray-100 rounded"
-                            onClick={() => handleCellClick(row)}
+                            onClick={(e) => handleCellClick(row, e)}
                           >
                             {row[column.id]?.toString() || ''}
                           </div>
