@@ -22,7 +22,7 @@ export async function GET(request: Request) {
           LOWER(t.final_hungarian) LIKE LOWER(?) OR
           LOWER(f.filename) LIKE LOWER(?) OR
           LOWER(t.key) LIKE LOWER(?)
-      `).get(`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`);
+      `).get(`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`) as { count: number };
   
       // Aktuális oldal adatainak lekérése
       const translations = db.prepare(`
