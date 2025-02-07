@@ -15,7 +15,7 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
           'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL, // Optional
           'X-Title': 'Translation App' // Optional
-        },
+        } as RequestInit['headers'],
         body: JSON.stringify({
           model: modelConfig.modelName,
           messages: [
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
     } catch (error) {
       return NextResponse.json(
-        { error: error.message },
+        { error: (error as any).message },
         { status: 400 }
       );
     }
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Translation error:', error);
     return NextResponse.json(
-      { error: 'Translation failed', details: error.message },
+      { error: 'Translation failed', details: (error as any).message },
       { status: 500 }
     );
   }

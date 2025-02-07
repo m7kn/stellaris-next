@@ -224,9 +224,10 @@ const DataGrid = () => {
   };  
 
   const handleBulkTranslate = async () => {
-    setIsTranslating(true); // Fordítás kezdete      
+    setIsTranslating(true);
     try {
       const selectedItems = data.filter(row => selectedRows.has(row.id));
+      const updatedData = [...data];
       
       for (const item of selectedItems) {
         const response = await fetch('/api/translate/openrouter', {
@@ -235,24 +236,44 @@ const DataGrid = () => {
           body: JSON.stringify({ 
             text: item.english_text,
             modelId: translator
-          }),
+          })
         });
-  
+        
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.message || 'Translation failed');
         }
   
         const { translation } = await response.json();
-        await handleCellEdit(item.id, 'temp_hungarian', translation);
+        
+        // Update database
+        const dbResponse = await fetch('/api/translations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'updateTranslation',
+            id: item.id,
+            temp_hungarian: translation
+          }),
+        });
+
+        if (!dbResponse.ok) throw new Error('Failed to update database');
+
+        // Update local state immediately
+        const itemIndex = updatedData.findIndex(row => row.id === item.id);
+        if (itemIndex !== -1) {
+          updatedData[itemIndex] = {
+            ...updatedData[itemIndex],
+            temp_hungarian: translation
+          };
+          setData([...updatedData]); // Create new array reference to trigger re-render
+        }
       }
-  
-      await fetchTranslations();
     } catch (error) {
       console.error('Bulk translation error:', error);
       alert(`Hiba történt a tömeges fordítás során: ${(error as any).message}`);
     } finally {
-      setIsTranslating(false); // Fordítás vége
+      setIsTranslating(false);
     }
   };
 
