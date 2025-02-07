@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { getModelConfig } from '@/config/models';
+import { Loader2 } from 'lucide-react';
 
 interface EditDialogProps {
   isOpen: boolean;
@@ -16,6 +18,7 @@ interface EditDialogProps {
   initialValue: string;
   englishText: string;
   rowKey: string;
+  translator: string;
 }
 
 const EditDialog: React.FC<EditDialogProps> = ({
@@ -24,9 +27,11 @@ const EditDialog: React.FC<EditDialogProps> = ({
   onSave,
   initialValue,
   englishText,
-  rowKey
+  rowKey,
+  translator
 }) => {
   const [value, setValue] = React.useState(initialValue);
+  const [isTranslating, setIsTranslating] = React.useState(false);
   
   // Reset value when dialog opens with new initialValue
   useEffect(() => {
@@ -46,6 +51,34 @@ const EditDialog: React.FC<EditDialogProps> = ({
     // Escape to close
     if (e.key === 'Escape') {
       onClose();
+    }
+  };
+
+  const handleTranslate = async () => {
+    try {
+      setIsTranslating(true); // Fordítás kezdete      
+      const response = await fetch('/api/translate/openrouter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: englishText,
+          modelId: translator
+        }),
+      });
+  
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Translation failed');
+      }
+  
+      const { translation } = await response.json();
+      // Csak a form értéket frissítjük
+      setValue(translation);
+    } catch (error) {
+      console.error('Translation error:', error);
+      alert(`Hiba történt a fordítás során: ${(error as any).message}`);
+    } finally {
+      setIsTranslating(false); // Fordítás vége      
     }
   };
 
@@ -78,6 +111,7 @@ const EditDialog: React.FC<EditDialogProps> = ({
               className="font-mono"
               placeholder="Írd be a fordítást..."
               autoFocus
+              disabled={isTranslating}
             />
           </div>
         </div>
@@ -90,7 +124,17 @@ const EditDialog: React.FC<EditDialogProps> = ({
               <Button variant="outline" onClick={onClose}>
                 Mégsem
               </Button>
-              <Button onClick={handleSave}>
+              <Button variant="secondary" onClick={handleTranslate} disabled={isTranslating}>
+                {isTranslating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Fordítás...
+                  </>
+                ) : (
+                  'AI Fordítás'
+                )}
+              </Button>              
+              <Button onClick={handleSave} disabled={isTranslating}>
                 Mentés
               </Button>
             </div>
@@ -102,3 +146,4 @@ const EditDialog: React.FC<EditDialogProps> = ({
 };
 
 export default EditDialog;
+

@@ -5,12 +5,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Check, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, Search, ChevronLeft, ChevronRight, Wand2 } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import { TableData } from '@/types/TableData';
 import { Translations } from '@/types/Translations';
 import SelectionControls from './SelectionControls';
 import EditDialog from './EditDialog';
+import { Label } from '@/components/ui/label';
+import { TRANSLATION_MODELS } from '@/config/models';
 
 const DataGrid = () => {
   const [data, setData] = useState<Translations[]>([]);
@@ -22,6 +24,7 @@ const DataGrid = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
   const [debouncedFilters] = useDebounce(filters, 500);
+  const [translator, setTranslator] = useState(TRANSLATION_MODELS[0].id);
 
   const columns: { id: keyof Translations, name: string, editable: boolean, width: string, type?: string }[] = [
     { id: 'id', name: 'ID', editable: false, width: '80px' },
@@ -188,6 +191,7 @@ const DataGrid = () => {
     value: string;
     englishText: string;
     key: string;
+    translator: string;
   } | null>(null);
 
   const handleCellClick = (row: Translations, event: React.MouseEvent) => {
@@ -199,7 +203,8 @@ const DataGrid = () => {
       rowId: row.id,
       value: row.temp_hungarian || '',
       englishText: row.english_text,
-      key: row.key || ''
+      key: row.key || '',
+      translator: translator
     });
     setEditDialogOpen(true);
   };
@@ -216,10 +221,65 @@ const DataGrid = () => {
     }
   };  
 
+  const handleBulkTranslate = async () => {
+    try {
+      const selectedItems = data.filter(row => selectedRows.has(row.id));
+      
+      for (const item of selectedItems) {
+        const response = await fetch('/api/translate/openrouter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            text: item.english_text,
+            modelId: translator
+          }),
+        });
+  
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Translation failed');
+        }
+  
+        const { translation } = await response.json();
+        await handleCellEdit(item.id, 'temp_hungarian', translation);
+      }
+  
+      await fetchTranslations();
+    } catch (error) {
+      console.error('Bulk translation error:', error);
+      alert(`Hiba történt a tömeges fordítás során: ${(error as any).message}`);
+    }
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-xl font-semibold mb-2">Fordítások kezelése</CardTitle>
+        <div className="mb-4">
+          <Label htmlFor="translator-select">Fordító szolgáltatás</Label>
+          <Select
+            value={translator}
+            onValueChange={setTranslator}
+          >
+            <SelectTrigger className="w-[300px]">
+              <SelectValue>
+                {TRANSLATION_MODELS.find(m => m.id === translator)?.displayName}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {TRANSLATION_MODELS.map(model => (
+                <SelectItem key={model.id} value={model.id}>
+                  <div className="flex flex-col gap-1">
+                    <div>{model.displayName}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {model.description} • {model.pricing}
+                    </div>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>        
         <SelectionControls
           onSelectAll={handleSelectAll}
           onClearSelection={handleClearSelection}
@@ -236,6 +296,15 @@ const DataGrid = () => {
             <Check className="mr-2 h-4 w-4" />
             Kijelölt fordítások véglegesítése
           </Button>
+          <Button 
+            onClick={handleBulkTranslate}
+            disabled={selectedRows.size === 0}
+            size="sm"
+            className="w-full sm:w-auto ml-2"
+          >
+            <Wand2 className="mr-2 h-4 w-4" />
+            Kijelöltek AI fordítása
+          </Button>          
           <div className="flex items-center gap-2">
             <Button
               onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -373,8 +442,9 @@ const DataGrid = () => {
           initialValue={editingCell.value}
           englishText={editingCell.englishText}
           rowKey={editingCell.key}
+          translator={translator}
         />
-      )}      
+      )}    
     </Card>
   );
 };
