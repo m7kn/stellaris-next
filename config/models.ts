@@ -5,8 +5,8 @@ export interface ModelConfig {
     displayName: string;
     provider: 'openrouter';
     modelName: string;
-    temperature: number;
-    maxTokens: number;
+    temperature?: number;
+    maxTokens?: number;
     description?: string;
     pricing?: string;
   }
@@ -19,7 +19,7 @@ export interface ModelConfig {
       provider: 'openrouter',
       modelName: 'deepseek/deepseek-r1:free',
       temperature: 0.7,
-      maxTokens: 1000,
+      //maxTokens: 1000,
       description: 'DeepSeek R1 (12.8B), nyílt forrású nyelvi modell kiváló utasításkövetési képességekkel',
       pricing: 'Ingyenes'
     },
@@ -30,7 +30,7 @@ export interface ModelConfig {
       provider: 'openrouter',
       modelName: 'mistralai/mistral-7b-instruct:free',
       temperature: 0.7,
-      maxTokens: 1000,
+      //maxTokens: 1000,
       description: 'Nagy teljesítményű, iparági standard 7.3B paraméteres modell optimalizált sebességgel',
       pricing: 'Ingyenes'
     },
@@ -41,7 +41,7 @@ export interface ModelConfig {
       provider: 'openrouter',
       modelName: 'openchat/openchat-7b:free',
       temperature: 0.7,
-      maxTokens: 1000,
+      //maxTokens: 1000,
       description: 'A Mistral 7B-n alapuló nyílt forrású chatbot modell, kibővített kontextussal',
       pricing: 'Ingyenes'
     },
@@ -52,7 +52,7 @@ export interface ModelConfig {
       provider: 'openrouter',
       modelName: 'google/gemini-2.0-flash-exp:free',
       temperature: 0.7,
-      maxTokens: 1000,
+      //maxTokens: 1000,
       description: 'Gyors kísérleti változata a Gemini 2.0-nak, Google legújabb nyelvi modelljének',
       pricing: 'Ingyenes'
     },
@@ -63,7 +63,7 @@ export interface ModelConfig {
       provider: 'openrouter',
       modelName: 'google/gemma-2-9b-it:free',
       temperature: 0.7,
-      maxTokens: 1000,
+      //maxTokens: 1000,
       description: 'A Google kompakt és hatékony nyelvi modellje, kiváló utasításkövetési képességekkel',
       pricing: 'Ingyenes'
     },
@@ -74,7 +74,7 @@ export interface ModelConfig {
       provider: 'openrouter',
       modelName: 'meta-llama/llama-3.1-70b-instruct:free',
       temperature: 0.7,
-      maxTokens: 1000,
+      //maxTokens: 1000,
       description: 'A Meta legnagyobb és legerősebb nyílt forrású nyelvi modellje, 70B paraméterrel',
       pricing: 'Ingyenes'
     }

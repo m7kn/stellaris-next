@@ -13,6 +13,7 @@ import SelectionControls from './SelectionControls';
 import EditDialog from './EditDialog';
 import { Label } from '@/components/ui/label';
 import { TRANSLATION_MODELS } from '@/config/models';
+import { Loader2 } from 'lucide-react';
 
 const DataGrid = () => {
   const [data, setData] = useState<Translations[]>([]);
@@ -25,6 +26,7 @@ const DataGrid = () => {
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
   const [debouncedFilters] = useDebounce(filters, 500);
   const [translator, setTranslator] = useState(TRANSLATION_MODELS[0].id);
+  const [isTranslating, setIsTranslating] = React.useState(false);
 
   const columns: { id: keyof Translations, name: string, editable: boolean, width: string, type?: string }[] = [
     { id: 'id', name: 'ID', editable: false, width: '80px' },
@@ -222,6 +224,7 @@ const DataGrid = () => {
   };  
 
   const handleBulkTranslate = async () => {
+    setIsTranslating(true); // Fordítás kezdete      
     try {
       const selectedItems = data.filter(row => selectedRows.has(row.id));
       
@@ -248,6 +251,8 @@ const DataGrid = () => {
     } catch (error) {
       console.error('Bulk translation error:', error);
       alert(`Hiba történt a tömeges fordítás során: ${(error as any).message}`);
+    } finally {
+      setIsTranslating(false); // Fordítás vége
     }
   };
 
@@ -298,12 +303,21 @@ const DataGrid = () => {
           </Button>
           <Button 
             onClick={handleBulkTranslate}
-            disabled={selectedRows.size === 0}
+            disabled={selectedRows.size === 0 || isTranslating}
             size="sm"
             className="w-full sm:w-auto ml-2"
           >
-            <Wand2 className="mr-2 h-4 w-4" />
-            Kijelöltek AI fordítása
+            {isTranslating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Fordítás...
+              </>
+            ) : (
+              <>
+                <Wand2 className="mr-2 h-4 w-4" />
+                Kijelöltek AI fordítása
+              </>
+            )}            
           </Button>          
           <div className="flex items-center gap-2">
             <Button
