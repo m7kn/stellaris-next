@@ -68,6 +68,12 @@ const DataGrid = () => {
     }
   };
 
+  // Initial data load
+  useEffect(() => {
+    fetchTranslations();
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Fetch data when page or filters change
   useEffect(() => {
     fetchTranslations();
   }, [page, debouncedFilters]);
@@ -223,6 +229,8 @@ const DataGrid = () => {
     }
   };  
 
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   const handleBulkTranslate = async () => {
     setIsTranslating(true);
     try {
@@ -230,43 +238,69 @@ const DataGrid = () => {
       const updatedData = [...data];
       
       for (const item of selectedItems) {
-        const response = await fetch('/api/translate/openrouter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            text: item.english_text,
-            modelId: translator
-          })
-        });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Translation failed');
-        }
-  
-        const { translation } = await response.json();
-        
-        // Update database
-        const dbResponse = await fetch('/api/translations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'updateTranslation',
-            id: item.id,
-            temp_hungarian: translation
-          }),
-        });
+        let retryCount = 0;
+        const maxRetries = 3;
+        const retryDelay = 30000; // 30 seconds
 
-        if (!dbResponse.ok) throw new Error('Failed to update database');
+        while (retryCount <= maxRetries) {
+          try {
+            const response = await fetch('/api/translate/openrouter', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                text: item.english_text,
+                modelId: translator
+              })
+            });
 
-        // Update local state immediately
-        const itemIndex = updatedData.findIndex(row => row.id === item.id);
-        if (itemIndex !== -1) {
-          updatedData[itemIndex] = {
-            ...updatedData[itemIndex],
-            temp_hungarian: translation
-          };
-          setData([...updatedData]); // Create new array reference to trigger re-render
+            if (response.status === 400) {
+              if (retryCount < maxRetries) {
+                console.log(`400 error encountered, retrying in ${retryDelay}ms...`);
+                await delay(retryDelay * (retryCount + 1));
+                retryCount++;
+                continue;
+              }
+            }
+            
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || 'Translation failed');
+            }
+
+            // If we get here, the request was successful
+            const { translation } = await response.json();
+            
+            // Update database and break the retry loop
+            const dbResponse = await fetch('/api/translations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'updateTranslation',
+                id: item.id,
+                temp_hungarian: translation
+              }),
+            });
+
+            if (!dbResponse.ok) throw new Error('Failed to update database');
+
+            // Update local state
+            const itemIndex = updatedData.findIndex(row => row.id === item.id);
+            if (itemIndex !== -1) {
+              updatedData[itemIndex] = {
+                ...updatedData[itemIndex],
+                temp_hungarian: translation
+              };
+              setData([...updatedData]);
+            }
+
+            break; // Exit retry loop on success
+          } catch (error) {
+            if (retryCount === maxRetries) {
+              throw error; // Re-throw if we've exhausted retries
+            }
+            retryCount++;
+            await delay(retryDelay);
+          }
         }
       }
     } catch (error) {
